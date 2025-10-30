@@ -79,6 +79,62 @@ services:
       - openwebui-data:/app/backend/data
     restart: unless-stopped
 
+  dev:  # Jupyter + CUDA + finetuning toolchain
+    build:
+      context: .
+      dockerfile: workspace/Dockerfile
+    container_name: llm-dev
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./workspace/data:/workspace/data
+      - ./workspace/adapters:/workspace/adapters
+      - ./workspace/modelfiles:/workspace/modelfiles
+      - ./workspace/notebooks:/workspace/notebooks
+      - ./workspace/src:/workspace/src
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+      - OLLAMA_HOST=http://ollama:11434
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-llm}
+    command:
+      - jupyter
+      - lab
+      - --ip=0.0.0.0
+      - --port=8888
+      - --ServerApp.token=${JUPYTER_TOKEN}
+      - --no-browser
+      - --ServerApp.allow_origin=*
+      - --ServerApp.allow_remote_access=True
+      - --allow-root
+    depends_on:
+      - ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: ["gpu"]
+
+  n8n:
+    image: n8nio/n8n:latest
+    depends_on: []
+    environment:
+      - TZ=${TZ}
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PORT=${N8N_PORT}
+      - N8N_PROTOCOL=${N8N_PROTOCOL}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      # Optional: allow Function node to import these libs
+      - NODE_FUNCTION_ALLOW_EXTERNAL=axios,lodash,dayjs
+    ports:
+      - "${N8N_PORT}:5678"
+    volumes:
+      - ./volumes/n8n:/home/node/.n8n
+    user: "1000:1000"
+    restart: unless-stopped
+  # <<< END n8n
+
 volumes:
   openwebui-data:
 
